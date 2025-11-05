@@ -8,7 +8,7 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 
 # Target PT hours
-TARGET_HOURS_PT = [15, 18, 21]  # 3 PM, 6 PM, 9 PM PT
+TARGET_HOURS_PT = [datetime.now(ZoneInfo("America/Los_Angeles")).hour]
 
 def scrape_numbers():
     url = "https://live.ipms247.com/booking/book-rooms-hollywoodviphotel"  # Replace with your target URL
