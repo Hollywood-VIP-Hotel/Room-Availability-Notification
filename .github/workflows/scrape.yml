@@ -1,9 +1,9 @@
-name: Scraper with PT DST
+name: Room Availability Scraper
 
 on:
   schedule:
-    # Run every hour; Python script handles exact PT times
-    - cron: '0 * * * *'
+    # Every 3 hours; Python script filters exact PT hours (3,6,9 PM)
+    - cron: '0 */3 * * *'
   workflow_dispatch:
 
 jobs:
@@ -30,3 +30,4 @@ jobs:
           TWILIO_PHONE: ${{ secrets.TWILIO_PHONE }}
           RECIPIENT_PHONE: ${{ secrets.RECIPIENT_PHONE }}
         run: python scraper.py
+
