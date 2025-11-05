@@ -24,9 +24,9 @@ def scrape_numbers():
 def send_email(total):
     sg = SendGridAPIClient(os.environ['SENDGRID_API_KEY'])
     message = Mail(
-        from_email='your_email@example.com',  # Replace with your verified SendGrid sender email
-        to_emails='recipient@example.com',     # Replace with your recipient email
-        subject='Room Availability Notification',
+        from_email='cherrytop3000@gmail.com',  # Replace with your verified SendGrid sender email
+        to_emails=['3104866003@tmomail.net', 'cherrytop3000@gmail.com'],     # Replace with your recipient email
+        subject='',
         plain_text_content=f'{total} rooms available'
     )
     response = sg.send(message)
