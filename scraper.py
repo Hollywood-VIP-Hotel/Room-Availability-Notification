@@ -12,13 +12,13 @@ from twilio.rest import Client
 TARGET_HOURS_PT = [15, 18, 21]  # 3 PM, 6 PM, 9 PM
 
 def scrape_numbers():
-    url = "https://example.com"  # Replace with your target URL
+    url = "https://live.ipms247.com/booking/book-rooms-hollywoodviphotel"  # Replace with your target URL
     r = requests.get(url)
     soup = BeautifulSoup(r.text, 'html.parser')
 
     # Example: find two numbers using CSS selectors
-    num1 = float(soup.select_one('#first-number').text.strip())
-    num2 = float(soup.select_one('#second-number').text.strip())
+    num1 = float(soup.select_one('#leftroom_0').text.strip())
+    num2 = float(soup.select_one('#leftroom_4').text.strip())
     return num1 + num2
 
 def send_email(total):
@@ -27,7 +27,7 @@ def send_email(total):
         from_email='your_email@example.com',
         to_emails='recipient@example.com',
         subject='Room Availability Notification',
-        plain_text_content=f'The total is {total}'
+        plain_text_content=f'{total} rooms available'
     )
     sg.send(message)
 
