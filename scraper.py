@@ -55,13 +55,11 @@ TO_EMAILS = ['3104866003@tmomail.net', 'cherrytop3000@gmail.com']
 
 def scrape_numbers():
     response = requests.post(POST_URL, data=PAYLOAD, headers=HEADERS)
-    data = response.json()
-    
-    # Replace these keys with the actual JSON keys for your numbers
-    num1 = float(data["leftroom_0"])
-    num2 = float(data["leftroom_4"])
-    
-    return num1 + num2
+    print("Status code:", response.status_code)
+    print("Response headers:", response.headers)
+    print("Response text (first 500 chars):")
+    print(response.text[:500])  # print first 500 chars for inspection
+    return 0  # temporarily skip email sending until we understand the response
 
 def send_email(total):
     message = Mail(
