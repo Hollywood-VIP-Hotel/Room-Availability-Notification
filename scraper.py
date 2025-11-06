@@ -84,8 +84,6 @@ def send_email(total):
 now_pt = datetime.now(ZoneInfo("America/Los_Angeles"))
 current_hour = now_pt.hour
 
-if current_hour in TARGET_HOURS_PT:
-    total = scrape_numbers()
-    send_email(total)
-else:
-    print(f"Current PT hour ({current_hour}) is not a target hour. Exiting.")
+print(f"Testing mode — forcing run at {current_hour} PT")
+total = scrape_numbers()
+send_email(total)
