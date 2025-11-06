@@ -1,80 +1,58 @@
 import os
 from datetime import datetime
 from zoneinfo import ZoneInfo
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
-from playwright.sync_api import sync_playwright
 
-# --------------------------
-# Configuration
-# --------------------------
-
-# Hours to send notification (Pacific Time)
-TARGET_HOURS_PT = [15, 18, 21]  # 3pm, 6pm, 9pm
-
+# --- Configuration ---
 URL = "https://live.ipms247.com/booking/book-rooms-hollywoodviphotel"
-SELECTOR_1 = "#leftroom_0"
-SELECTOR_2 = "#leftroom_4"
-
-# SendGrid configuration
-SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
+TARGET_HOURS_PT = [15, 18, 21]  # 3pm, 6pm, 9pm PST
 FROM_EMAIL = "cherrytop3000@gmail.com"
-TO_EMAILS = ['3104866003@tmomail.net', 'cherrytop3000@gmail.com']
+TO_EMAILS = ['3104866003@tmomail.net', 'cherrytop3000@gmail.com']  # can be a list
 
-# --------------------------
-# Functions
-# --------------------------
+# --- Check current PST hour ---
+pst_now = datetime.now(ZoneInfo("America/Los_Angeles"))
+current_hour = pst_now.hour
 
-def scrape_numbers():
-    """Launch a headless browser, load the page, and read the two numbers."""
-    with sync_playwright() as p:
-        browser = p.firefox.launch(headless=True)
-        page = browser.new_page()
+if current_hour not in TARGET_HOURS_PT:
+    print(f"Current PT hour ({current_hour}) is not a target hour. Exiting.")
+    exit()
 
-        print("Loading page...")
-        page.goto(URL, timeout=60000)
+# --- Scrape the numbers ---
+options = Options()
+options.add_argument("--headless=new")
+options.add_argument("--no-sandbox")
+options.add_argument("--disable-dev-shm-usage")
+driver = webdriver.Chrome(options=options)
 
-        # Wait for the elements to appear (adjust timeout if needed)
-        page.wait_for_selector(SELECTOR_1, timeout=20000)
-        page.wait_for_selector(SELECTOR_2, timeout=20000)
+try:
+    print("Loading page...")
+    driver.get(URL)
+    driver.implicitly_wait(5)  # wait for page to load / JS to render
 
-        num1_text = page.inner_text(SELECTOR_1).strip()
-        num2_text = page.inner_text(SELECTOR_2).strip()
-        browser.close()
+    # Update these selectors to match the numbers on the page
+    num1 = int(driver.find_element(By.CSS_SELECTOR, "#leftroom_0").text.strip())
+    num2 = int(driver.find_element(By.CSS_SELECTOR, "#leftroom_4").text.strip())
+    total = num1 + num2
+    print(f"Scraped values: {num1}, {num2} | Total: {total}")
 
-        print(f"Scraped values: {num1_text}, {num2_text}")
-        try:
-            num1 = float(num1_text)
-            num2 = float(num2_text)
-        except ValueError:
-            raise ValueError(f"Could not parse numbers: {num1_text}, {num2_text}")
-        return num1 + num2
+finally:
+    driver.quit()
 
+# --- Send email ---
+message = Mail(
+    from_email=FROM_EMAIL,
+    to_emails=TO_EMAILS,
+    subject="",  # empty if you want no subject
+    html_content=f"<strong>{total} rooms available</strong>"
+)
 
-def send_email(total):
-    """Send results via SendGrid."""
-    message = Mail(
-        from_email=FROM_EMAIL,
-        to_emails=TO_EMAILS,
-        subject="",  # No subject
-        plain_text_content=f"{total} rooms available",
-    )
-
-    try:
-        sg = SendGridAPIClient(SENDGRID_API_KEY)
-        sg.send(message)
-        print("Email sent successfully!")
-    except Exception as e:
-        print(f"Error sending email: {e}")
-
-
-# --------------------------
-# Main Execution
-# --------------------------
-
-now_pt = datetime.now(ZoneInfo("America/Los_Angeles"))
-current_hour = now_pt.hour
-
-print("Testing mode — forcing run")
-total = scrape_numbers()
-send_email(total)
+try:
+    sg = SendGridAPIClient(os.environ.get("SENDGRID_API_KEY"))
+    response = sg.send(message)
+    print("Email sent successfully, status code:", response.status_code)
+except Exception as e:
+    print("Error sending email:", e)
