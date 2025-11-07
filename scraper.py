@@ -1,7 +1,5 @@
 import os
 import requests
-import smtplib
-from email.mime.text import MIMEText
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from selenium import webdriver
@@ -10,15 +8,9 @@ from selenium.webdriver.common.by import By
 
 # --- Configuration ---
 URL = "https://live.ipms247.com/booking/book-rooms-hollywoodviphotel"
-TARGET_HOURS_PT = [15, 18, 21]  # 3pm, 6pm, 9pm PT
+TARGET_HOURS_PT = [15, 18, 21]  # 3pm, 6pm, 9pm Pacific Time
 
-FORMSPREE_ENDPOINT = os.environ.get("FORMSPREE_ENDPOINT")
-
-if not FORMSPREE_ENDPOINT:
-    print("Missing Formspree endpoint.")
-    exit(1)
-
-# --- PST/PDT Time Check ---
+# --- Time check ---
 pst_now = datetime.now(ZoneInfo("America/Los_Angeles"))
 current_hour = pst_now.hour
 
@@ -39,6 +31,7 @@ try:
     driver.get(URL)
     driver.implicitly_wait(5)
 
+    # your updated selectors
     num1 = int(driver.find_element(By.CSS_SELECTOR, "#leftroom_0").text.strip())
     num2 = int(driver.find_element(By.CSS_SELECTOR, "#leftroom_4").text.strip())
     total = num1 + num2
@@ -48,19 +41,23 @@ try:
 finally:
     driver.quit()
 
-# --- Send notification via Formspree ---
+# --- Send notification to Make.com webhook ---
 message = f"{total} rooms available"
 
+webhook_url = os.environ.get("MAKE_WEBHOOK_URL")
+if not webhook_url:
+    print("Missing MAKE_WEBHOOK_URL environment variable.")
+    exit(1)
+
+payload = {"value1": message}
+
 try:
-    response = requests.post(
-        FORMSPREE_ENDPOINT,
-        data={"message": message},
-        timeout=10
-    )
-    if response.status_code in [200, 202]:
-        print("Notification sent successfully via Formspree!")
+    response = requests.post(webhook_url, json=payload, timeout=10)
+
+    if response.status_code in (200, 202):
+        print("Notification sent to Make webhook!")
     else:
-        print(f"Formspree returned {response.status_code}: {response.text}")
+        print(f"Make webhook returned {response.status_code}: {response.text}")
 
 except Exception as e:
-    print("Error sending Formspree notification:", e)
+    print("Error sending to webhook:", e)
