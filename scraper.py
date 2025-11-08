@@ -33,87 +33,108 @@ if current_hour not in TARGET_HOURS_PT:
 
 # -------------------------------------------------------------
 # Selenium setup
+#   IMPORTANT:
+#   - We DO NOT run headless.
+#   - GitHub uses Xvfb virtual display via xvfb-run in workflow.
 # -------------------------------------------------------------
 options = Options()
-options.add_argument("--headless=new")
-options.add_argument("--no-sandbox")
+
+# DO NOT USE HEADLESS MODE — booking engine blocks it
+# options.add_argument("--headless=new")
+
 options.add_argument("--disable-dev-shm-usage")
+options.add_argument("--no-sandbox")
+
+# VERY IMPORTANT — use a real Chrome desktop user-agent
+options.add_argument(
+    "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/120.0.0.0 Safari/537.36"
+)
 
 driver = webdriver.Chrome(options=options)
 wait = WebDriverWait(driver, 30)
 
 
+# -------------------------------------------------------------
+# Load page and wait for booking engine root container
+# -------------------------------------------------------------
 try:
     print("[INFO] Loading page...")
     driver.get(URL)
 
-    # ---------------------------------------------------------
-    # Wait for the booking engine root container
-    # ---------------------------------------------------------
-    print("[INFO] Waiting for booking engine container...")
+    print("[INFO] Waiting for booking engine container (#eZ_BookingRooms)...")
     wait.until(EC.presence_of_element_located((By.ID, "eZ_BookingRooms")))
 
-    # ---------------------------------------------------------
-    # Helper: wait for value stabilization
-    # ---------------------------------------------------------
-    def get_stable_value(css_selector):
-        """
-        Waits for the room availability number to:
-        - exist
-        - be numeric
-        - stabilize (same value twice in a row)
-        """
-        print(f"[INFO] Waiting for stable value in {css_selector}...")
+    # Give the booking engine time to finish JS initialization
+    print("[INFO] Waiting additional 3 seconds for JS scripts...")
+    time.sleep(3)
 
-        # Step 1: wait for element
-        wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, css_selector)))
-
-        # Step 2: wait for it to become numeric
-        def is_numeric(driver):
-            try:
-                t = driver.find_element(By.CSS_SELECTOR, css_selector).text.strip()
-                return t.isdigit()
-            except:
-                return False
-
-        wait.until(is_numeric)
-
-        # Step 3: wait for stabilization — most important fix
-        stable_count = 0
-        last_value = None
-
-        for _ in range(20):  # up to ~20 seconds
-            try:
-                text = driver.find_element(By.CSS_SELECTOR, css_selector).text.strip()
-                if text.isdigit():
-                    if text == last_value:
-                        stable_count += 1
-                        if stable_count >= 2:  # stable two consecutive reads
-                            print(f"[INFO] Stable value detected for {css_selector}: {text}")
-                            return int(text)
-                    else:
-                        stable_count = 0
-                        last_value = text
-                time.sleep(1)
-            except:
-                time.sleep(1)
-
-        # Fallback if not stabilized (rare)
-        print(f"[WARN] Could not detect full stabilization. Using last seen value: {last_value}")
-        return int(last_value)
-
-
-    # ---------------------------------------------------------
-    # Extract FINAL correct values
-    # ---------------------------------------------------------
-    num1 = get_stable_value("#leftroom_0")
-    num2 = get_stable_value("#leftroom_4")
-    total = num1 + num2
-
-    print(f"[SUCCESS] FINAL ROOM AVAILABILITY: {num1} + {num2} = {total}")
-
-finally:
+except Exception as e:
+    print("[ERROR] Could not load initial page or container:", e)
     driver.quit()
+    exit(1)
+
+
+# -------------------------------------------------------------
+# Wait for stable numeric values
+# -------------------------------------------------------------
+def get_stable_value(css_selector):
+    """
+    Extracts the FINAL room availability by:
+    - Waiting for the span to exist
+    - Waiting until it contains numbers
+    - Waiting until the number stops changing (stabilizes)
+    """
+    print(f"[INFO] Waiting for element {css_selector} to appear...")
+    wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, css_selector)))
+
+    stable_count = 0
+    last_value = None
+
+    print(f"[INFO] Waiting for stable numeric value in {css_selector}...")
+
+    for _ in range(30):  # up to ~30 seconds
+        try:
+            text = driver.find_element(By.CSS_SELECTOR, css_selector).text.strip()
+
+            if text.isdigit():
+                # First numeric value
+                if last_value is None:
+                    last_value = text
+                # If it stops changing, we found the real value
+                elif text == last_value:
+                    stable_count += 1
+                    if stable_count >= 2:  # stable for 2 seconds
+                        print(f"[INFO] Stable value detected in {css_selector}: {text}")
+                        return int(text)
+                else:
+                    # Reset stability counter
+                    stable_count = 0
+                    last_value = text
+
+        except:
+            pass
+
+        time.sleep(1)
+
+    # Fallback if never stabilized
+    print(f"[WARN] Value did not stabilize for {css_selector}. Using last known: {last_value}")
+    return int(last_value)
+
+
+# -------------------------------------------------------------
+# Extract FINAL room availability values
+# -------------------------------------------------------------
+num1 = get_stable_value("#leftroom_0")
+num2 = get_stable_value("#leftroom_4")
+total = num1 + num2
+
+print(f"[SUCCESS] FINAL ROOM AVAILABILITY: {num1} + {num2} = {total}")
+
+
+# Close browser
+driver.quit()
 
 
 # -------------------------------------------------------------
@@ -133,7 +154,7 @@ try:
     response = requests.post(webhook_url, json=payload, timeout=15)
 
     if response.status_code in (200, 202):
-        print("[SUCCESS] Notification sent!")
+        print("[SUCCESS] Notification sent to Make webhook!")
     else:
         print(f"[ERROR] Webhook error {response.status_code}: {response.text}")
 
