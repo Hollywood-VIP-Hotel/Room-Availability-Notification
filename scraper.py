@@ -17,7 +17,7 @@ from selenium.webdriver.support import expected_conditions as EC
 URL = "https://live.ipms247.com/booking/book-rooms-hollywoodviphotel"
 
 # Notify only at 3pm, 6pm, 9pm PT
-TARGET_HOURS_PT = [15, 18, 21]
+TARGET_HOURS_PT = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
 
 # -------------------------------------------------------------
 # Time gating (PST/PDT)
