@@ -13,16 +13,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Install system dependencies (Chrome + Xvfb)
+      - name: Install system dependencies (Xvfb)
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb
 
-      - name: Install Chrome
+      - name: Install Google Chrome
         uses: browser-actions/setup-chrome@v1
 
-      - name: Install ChromeDriver
-        uses: browser-actions/setup-chromedriver@v1
+      - name: Install matching ChromeDriver
+        uses: NaniteSystem/setup-chromedriver@v1
+        with:
+          chrome-version: latest
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -34,7 +36,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run scraper inside Xvfb (non-headless Chrome)
+      - name: Run scraper in non-headless mode with Xvfb
         env:
           MAKE_WEBHOOK_URL: ${{ secrets.MAKE_WEBHOOK_URL }}
         run: |
