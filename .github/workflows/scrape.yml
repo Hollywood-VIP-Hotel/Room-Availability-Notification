@@ -2,7 +2,18 @@ name: Room Availability Notification
 
 on:
   schedule:
-    - cron: "*/15 * * * *"
+    # --- 2:50 PM PT (PST & PDT)
+    - cron: "50 22 * * *"   # 14:50 PST -> 22:50 UTC
+    - cron: "50 21 * * *"   # 14:50 PDT -> 21:50 UTC
+
+    # --- 5:50 PM PT (PST & PDT)
+    - cron: "50 1 * * *"    # 17:50 PST -> 01:50 UTC next day
+    - cron: "50 0 * * *"    # 17:50 PDT -> 00:50 UTC
+
+    # --- 8:50 PM PT (PST & PDT)
+    - cron: "50 4 * * *"    # 20:50 PST -> 04:50 UTC next day
+    - cron: "50 3 * * *"    # 20:50 PDT -> 03:50 UTC
+
   workflow_dispatch:
 
 jobs:
