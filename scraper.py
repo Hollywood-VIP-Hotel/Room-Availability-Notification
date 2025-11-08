@@ -8,7 +8,7 @@ from selenium.webdriver.common.by import By
 
 # --- Configuration ---
 URL = "https://live.ipms247.com/booking/book-rooms-hollywoodviphotel"
-TARGET_HOURS_PT = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
+TARGET_HOURS_PT = [15, 18, 21]
 
 # --- Time check ---
 pst_now = datetime.now(ZoneInfo("America/Los_Angeles"))
