@@ -20,6 +20,7 @@ URL = "https://live.ipms247.com/booking/book-rooms-hollywoodviphotel"
 # Only send notifications at 3pm, 6pm, 9pm PT
 TARGET_HOURS_PT = [15, 18, 21]
 
+
 # -------------------------------------------------------------
 # Time gating (Pacific Time)
 # -------------------------------------------------------------
