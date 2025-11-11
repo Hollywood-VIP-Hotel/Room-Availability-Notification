@@ -18,7 +18,7 @@ from selenium.webdriver.support import expected_conditions as EC
 URL = "https://live.ipms247.com/booking/book-rooms-hollywoodviphotel"
 
 # Only send notifications at 3pm, 6pm, 9pm PT
-TARGET_HOURS_PT = [17, 18, 21]
+TARGET_HOURS_PT = [15, 18, 21]
 
 
 # -------------------------------------------------------------
@@ -132,7 +132,7 @@ num2 = get_stable_value("#leftroom_4")
 num3 = get_stable_value("#leftroom_6")
 total = num1 + num2 + num3
 
-print(f"[SUCCESS] FINAL ROOM AVAILABILITY: {num1} + {num2}+ {num3} = {total}")
+print(f"[SUCCESS] FINAL ROOM AVAILABILITY: {num1} + {num2} + {num3} = {total}")
 
 
 # Close browser
