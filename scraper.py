@@ -80,37 +80,46 @@ except Exception as e:
 # -------------------------------------------------------------
 # Wait for stable numeric values
 # -------------------------------------------------------------
+
 def get_stable_value(css_selector):
     """
-    Extracts the FINAL room availability by:
-    - Waiting for the span to exist
-    - Waiting until it contains numbers
-    - Waiting until the number stops changing (stabilizes)
+    Extracts a stable numeric availability value.
+    If the element never loads (missing room type), return 0 instead of failing.
     """
-    print(f"[INFO] Waiting for element {css_selector} to appear...")
-    wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, css_selector)))
+
+    print(f"[INFO] Checking for element {css_selector}...")
+
+    # Try to wait for the element to appear
+    try:
+        wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, css_selector)))
+    except:
+        # Element does not exist on this date / or JS failed
+        print(f"[WARN] Element {css_selector} not found — treating as 0")
+        return 0
 
     stable_count = 0
     last_value = None
 
     print(f"[INFO] Waiting for stable numeric value in {css_selector}...")
 
-    for _ in range(30):  # up to ~30 seconds
+    for _ in range(30):  # ~30 seconds max
         try:
             text = driver.find_element(By.CSS_SELECTOR, css_selector).text.strip()
 
             if text.isdigit():
-                # First numeric value
                 if last_value is None:
+                    # First numeric value seen
                     last_value = text
-                # If it stops changing, we found the real value
+
                 elif text == last_value:
+                    # Stable twice in a row
                     stable_count += 1
-                    if stable_count >= 2:  # stable for 2 seconds
+                    if stable_count >= 2:
                         print(f"[INFO] Stable value detected in {css_selector}: {text}")
                         return int(text)
+
                 else:
-                    # Reset stability counter
+                    # Value changed — reset stability counter
                     stable_count = 0
                     last_value = text
 
@@ -119,10 +128,9 @@ def get_stable_value(css_selector):
 
         time.sleep(1)
 
-    # Fallback if never stabilized
-    print(f"[WARN] Value did not stabilize for {css_selector}. Using last known: {last_value}")
-    return int(last_value)
-
+    # If still unstable, return last number or 0
+    print(f"[WARN] Value did not stabilize for {css_selector}. Using last known: {last_value or 0}")
+    return int(last_value or 0)
 
 # -------------------------------------------------------------
 # Extract FINAL room availability values
