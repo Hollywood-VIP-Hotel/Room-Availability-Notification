@@ -18,7 +18,7 @@ from selenium.webdriver.support import expected_conditions as EC
 URL = "https://live.ipms247.com/booking/book-rooms-hollywoodviphotel"
 
 # Only send notifications at 3pm, 6pm, 9pm PT
-TARGET_HOURS_PT = [14, 17, 19]
+TARGET_HOURS_PT = [14, 17, 20]
 
 
 # -------------------------------------------------------------
