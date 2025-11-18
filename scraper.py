@@ -1,7 +1,7 @@
 import os
 import time
 import requests
-from datetime import datetime
+from datetime import datetime, time as dtime
 from zoneinfo import ZoneInfo
 
 from selenium import webdriver
@@ -17,36 +17,59 @@ from selenium.webdriver.support import expected_conditions as EC
 # -------------------------------------------------------------
 URL = "https://live.ipms247.com/booking/book-rooms-hollywoodviphotel"
 
-# Only send notifications at 3pm, 6pm, 9pm PT
-TARGET_HOURS_PT = [8, 12, 14, 17, 20]
+# Half-hour windows around target times (PT)
+WINDOWS_PT = [
+    (dtime(7, 45), dtime(8, 15)),
+    (dtime(11, 45), dtime(12, 15)),
+    (dtime(14, 45), dtime(15, 15)),
+    (dtime(17, 45), dtime(18, 15)),
+    (dtime(20, 45), dtime(21, 15)),
+]
+
+LAST_SENT_FILE = "/tmp/room_notify_last_window.txt"
 
 
 # -------------------------------------------------------------
-# Time gating (Pacific Time)
+# Helper to check if now is inside a window
+# -------------------------------------------------------------
+def in_window(now):
+    for start, end in WINDOWS_PT:
+        if start <= now.timetz() <= end:
+            return f"{start}-{end}"  # return window ID
+    return None
+
+
+# -------------------------------------------------------------
+# Time gating logic
 # -------------------------------------------------------------
 pst_now = datetime.now(ZoneInfo("America/Los_Angeles"))
-current_hour = pst_now.hour
+current_window = in_window(pst_now)
 
-if current_hour not in TARGET_HOURS_PT:
-    print(f"[INFO] Current PT hour ({current_hour}) is not a target hour. Exiting.")
+if not current_window:
+    print(f"[INFO] Current PT time ({pst_now.time()}) is outside all send windows. Exiting.")
     exit()
+
+# Check if this window has already sent
+if os.path.exists(LAST_SENT_FILE):
+    with open(LAST_SENT_FILE, "r") as f:
+        last_sent_window = f.read().strip()
+else:
+    last_sent_window = ""
+
+if last_sent_window == current_window:
+    print(f"[INFO] Already sent notification for window {current_window}. Exiting.")
+    exit()
+
+print(f"[INFO] Inside allowed window: {current_window}")
 
 
 # -------------------------------------------------------------
 # Selenium setup
-#   IMPORTANT:
-#   - We DO NOT run headless.
-#   - GitHub uses Xvfb virtual display via xvfb-run in workflow.
 # -------------------------------------------------------------
 options = Options()
 
-# DO NOT USE HEADLESS MODE — booking engine blocks it
-# options.add_argument("--headless=new")
-
 options.add_argument("--disable-dev-shm-usage")
 options.add_argument("--no-sandbox")
-
-# VERY IMPORTANT — use a real Chrome desktop user-agent
 options.add_argument(
     "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -58,7 +81,7 @@ wait = WebDriverWait(driver, 30)
 
 
 # -------------------------------------------------------------
-# Load page and wait for booking engine root container
+# Load page
 # -------------------------------------------------------------
 try:
     print("[INFO] Loading page...")
@@ -67,7 +90,6 @@ try:
     print("[INFO] Waiting for booking engine container (#eZ_BookingRooms)...")
     wait.until(EC.presence_of_element_located((By.ID, "eZ_BookingRooms")))
 
-    # Give the booking engine time to finish JS initialization
     print("[INFO] Waiting additional 3 seconds for JS scripts...")
     time.sleep(3)
 
@@ -78,22 +100,14 @@ except Exception as e:
 
 
 # -------------------------------------------------------------
-# Wait for stable numeric values
+# Room scraping
 # -------------------------------------------------------------
-
 def get_stable_value(css_selector):
-    """
-    Extracts a stable numeric availability value.
-    If the element never loads (missing room type), return 0 instead of failing.
-    """
-
     print(f"[INFO] Checking for element {css_selector}...")
 
-    # Try to wait for the element to appear
     try:
         wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, css_selector)))
     except:
-        # Element does not exist on this date / or JS failed
         print(f"[WARN] Element {css_selector} not found — treating as 0")
         return 0
 
@@ -102,24 +116,19 @@ def get_stable_value(css_selector):
 
     print(f"[INFO] Waiting for stable numeric value in {css_selector}...")
 
-    for _ in range(30):  # ~30 seconds max
+    for _ in range(30):
         try:
             text = driver.find_element(By.CSS_SELECTOR, css_selector).text.strip()
 
             if text.isdigit():
                 if last_value is None:
-                    # First numeric value seen
                     last_value = text
-
                 elif text == last_value:
-                    # Stable twice in a row
                     stable_count += 1
                     if stable_count >= 2:
-                        print(f"[INFO] Stable value detected in {css_selector}: {text}")
+                        print(f"[INFO] Stable value in {css_selector}: {text}")
                         return int(text)
-
                 else:
-                    # Value changed — reset stability counter
                     stable_count = 0
                     last_value = text
 
@@ -128,12 +137,12 @@ def get_stable_value(css_selector):
 
         time.sleep(1)
 
-    # If still unstable, return last number or 0
     print(f"[WARN] Value did not stabilize for {css_selector}. Using last known: {last_value or 0}")
     return int(last_value or 0)
 
+
 # -------------------------------------------------------------
-# Extract FINAL room availability values
+# Extract availability
 # -------------------------------------------------------------
 num1 = get_stable_value("#leftroom_0")
 num2 = get_stable_value("#leftroom_4")
@@ -142,13 +151,11 @@ total = num1 + num2 + num3
 
 print(f"[SUCCESS] FINAL ROOM AVAILABILITY: {num1} + {num2} + {num3} = {total}")
 
-
-# Close browser
 driver.quit()
 
 
 # -------------------------------------------------------------
-# Send notification to Make webhook
+# Send notification
 # -------------------------------------------------------------
 webhook_url = os.environ.get("MAKE_WEBHOOK_URL")
 
@@ -165,6 +172,11 @@ try:
 
     if response.status_code in (200, 202):
         print("[SUCCESS] Notification sent to Make webhook!")
+
+        # mark window as sent
+        with open(LAST_SENT_FILE, "w") as f:
+            f.write(current_window)
+
     else:
         print(f"[ERROR] Webhook error {response.status_code}: {response.text}")
 
