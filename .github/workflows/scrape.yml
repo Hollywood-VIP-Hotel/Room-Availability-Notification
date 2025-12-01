@@ -2,7 +2,7 @@ name: Room Availability Notification
 
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "3,49,58 8,12,15,18,21 * * *"
   workflow_dispatch:
 
 jobs:
