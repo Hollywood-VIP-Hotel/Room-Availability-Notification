@@ -11,6 +11,49 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
+
+# -------------------------------------------------------------
+# Notification time windows (Pacific Time)
+# 30-minute windows centered on each target hour
+# -------------------------------------------------------------
+TARGET_WINDOWS = {
+    8:  "8am",
+    12: "12pm",
+    15: "3pm",
+    18: "6pm",
+    21: "9pm",
+}
+
+WINDOW_SPAN_MIN = 15  # 15 minutes before & after
+
+
+def get_current_window_label():
+    """Return the label ('8am', '12pm', etc.) if inside an allowed window; otherwise None."""
+    pst_now = datetime.now(ZoneInfo("America/Los_Angeles"))
+
+    for hour, label in TARGET_WINDOWS.items():
+        center = pst_now.replace(hour=hour, minute=0, second=0, microsecond=0)
+        early = center - timedelta(minutes=WINDOW_SPAN_MIN)
+        late = center + timedelta(minutes=WINDOW_SPAN_MIN)
+
+        if early <= pst_now <= late:
+            return label
+
+    return None
+
+
+# -------------------------------------------------------------
+# Only run inside designated time windows
+# -------------------------------------------------------------
+window_label = get_current_window_label()
+
+if window_label is None:
+    print("[INFO] Current time is not inside any notification window. Exiting.")
+    exit()
+
+print(f"[INFO] Inside allowed window: {window_label}")
+
+
 # -------------------------------------------------------------
 # Selenium & scraping logic (unchanged)
 # -------------------------------------------------------------
@@ -99,6 +142,7 @@ if not webhook_url:
 
 payload = {
     "value1": f"{total} rooms available",
+    "window": window_label  # <-- KEY for Make.com dedup
 }
 
 print("[INFO] Sending to Make webhook...")
